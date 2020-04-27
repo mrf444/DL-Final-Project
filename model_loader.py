@@ -23,7 +23,7 @@ class ModelLoader():
     team_member = ['ak7288','mrf444']
     contact_email = '@nyu.edu'
 
-    def __init__(self, model_file='UNet'):
+    def __init__(self, model_file='BB-UNet'):
         # You should 
         #       1. create the model object
         #       2. load your state_dict
@@ -33,7 +33,7 @@ class ModelLoader():
         # Define model, load from saved trained model, and sent to device
 
         #parse model string
-        #bb_model_file, unet_model_file = model_file.split('-') #split on the dash
+        bb_model_file, unet_model_file = model_file.split('-') #split on the dash
 
         #call cuda()
         cuda = torch.cuda.is_available()
@@ -41,7 +41,7 @@ class ModelLoader():
 
         #load UNet for roadmap predictions
         self.unet_model = UNet(num_classes=2)
-        self.unet_model.load_state_dict(torch.load(model_file)) #unet_model_file
+        self.unet_model.load_state_dict(torch.load(unet_model_file)) #unet_model_file
         self.unet_model.to(self.device)
 
     def get_bounding_boxes(self, samples):

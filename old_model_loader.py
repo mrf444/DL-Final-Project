@@ -13,55 +13,60 @@ import torchvision
 from project_models import *
 
 # Put your transform function here, we will use it for our dataloader
-# For bounding boxes task
-def get_transform_task1(): 
-    return torchvision.transforms.ToTensor()
-# For road map task
-def get_transform_task2(): 
+def get_transform(): 
     return torchvision.transforms.ToTensor()
 
 class ModelLoader():
     # Fill the information for your team
     team_name = 'Leafy Green Team'
-    team_number = 2
-    round_number = 2
+    round_number = 1
     team_member = ['ak7288','mrf444']
     contact_email = '@nyu.edu'
 
-    def __init__(self, model_file='models'):
+    def __init__(self, model_file='UNet-UNet_bb'):
         # You should 
         #       1. create the model object
         #       2. load your state_dict
         #       3. call cuda()
         # self.model = ...
         # 
+        # Define model, load from saved trained model, and sent to device
+
         #call cuda()
         cuda = torch.cuda.is_available()
         self.device = torch.device("cuda:0" if cuda else "cpu")
 
         #load UNet for roadmap predictions
-        self.unet_roadmap_model = UNet(num_classes=2, semi_supervised=False)
-        self.unet_roadmap_model.load_state_dict(torch.load(model_file)['unet_roadmap']) #roadmaps
+        self.unet_roadmap_model = UNet(num_classes=2)
+        self.unet_roadmap_model.load_state_dict(torch.load(model_file)['UNet']) #roadmaps
         self.unet_roadmap_model.to(self.device)
         
         #load UNet for bounding box predictions
-        #feature extractor
-        self.feature_extractor = Unsupervised_Model_wo_convtrans()
-        self.feature_extractor.linear2 = Identity()
-        self.feature_extractor.load_state_dict(torch.load(model_file)['feature_extractor_unfrozen']) #already double
-        self.feature_extractor.to(self.device)
-        
-        #semi_supervised UNet
-        self.unet_semisupervised = UNet(num_classes=2,semi_supervised=True)
-        self.unet_semisupervised.load_state_dict(torch.load(model_file)['semi_supervised_unfrozen']) #already double
-        self.unet_semisupervised.to(self.device)
+        self.unet_bb_model = UNet(num_classes=2)
+        self.unet_bb_model.load_state_dict(torch.load(model_file)['UNet_bb'])
+        self.unet_bb_model.load_state_dict(torch.load(model_file))#bounding box
+        self.unet_bb_model.to(self.device)
 
     def get_bounding_boxes(self, samples):
         # samples is a cuda tensor with size [batch_size, 6, 3, 256, 306]
         # You need to return a tuple with size 'batch_size' and each element is a cuda tensor [N, 2, 4]
         # where N is the number of object
+        
+        #averaged input
+        model_input = torch.mean(samples,axis=1)
 
-        return torch.rand(1, 15, 2, 4) * 10
+        # Send data and target to device
+        model_input = model_input.to(self.device)
+
+        # Pass data through model
+        output = self.unet_bb_model(model_input) #returns [batch_size,2,800,800]
+        output = F.softmax(output,dim=1) #[batch_size,2,800,800]
+        
+        #threshold output
+        output = output.squeeze(0) #[2,800,800]
+        model_preds = 1*(output[1] > 0.1)
+        
+        return get_bboxes_from_output(model_preds).unsqueeze(0)
 
     def get_binary_road_map(self, samples):
         # samples is a cuda tensor with size [batch_size, 6, 3, 256, 306]
